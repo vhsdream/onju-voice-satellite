@@ -17,6 +17,8 @@ esphome:
     board_build.arduino.memory_type: qio_opi
     build_flags: "-DBOARD HAS PSRAM"
     board_build.flash_mode: dio
+    build_flags: "-DBOARD_HAS_PSRAM"
+    board_build.arduino.memory_type: qio_opi
   on_boot:
     then:
       - light.turn_on:
