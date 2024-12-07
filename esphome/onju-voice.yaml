@@ -6,6 +6,13 @@ substitutions:
   error_sound_url: "https://github.com/tetele/onju-voice-satellite/raw/main/res/error.mp3" # Error #8 by UNIVERSFIELD https://freesound.org/people/UNIVERSFIELD/sounds/734442/
   timer_finished_sound_url: "https://github.com/tetele/onju-voice-satellite/raw/main/res/timer_finished.mp3" # New Notification #6 by UNIVERSFIELD https://freesound.org/people/UNIVERSFIELD/sounds/734445/
 
+external_components:
+  - source:
+      type: git
+      url: https://github.com/gnumpi/esphome_audio
+      ref: dev-next
+    components: [adf_pipeline, i2s_audio]
+
 esphome:
   name: "${name}"
   friendly_name: "${friendly_name}"
@@ -48,12 +55,15 @@ esphome:
       - script.execute: reset_led
 
 dashboard_import:
-  package_import_url: github://tetele/onju-voice-satellite/esphome/onju-voice.yaml@main
+  package_import_url: github://vhsdream/onju-voice-satellite/esphome/onju-voice.yaml@better-sound
 
 esp32:
   board: esp32-s3-devkitc-1
   framework:
-    type: arduino
+    type: esp-idf
+    version: recommended
+    sdkconfig_options:
+      CONFIG_ESP32_S3_BOX_BOARD: "y"
 
 psram:
   mode: octal
@@ -127,17 +137,51 @@ interval:
 i2s_audio:
   - i2s_lrclk_pin: GPIO13
     i2s_bclk_pin: GPIO18
+    access_mode: duplex
+
+adf_pipeline:
+  - platform: i2s_audio
+    type: audio_out
+    id: adf_i2s_out
+    i2s_audio_id: i2s_shared
+    i2s_dout_pin: GPIO12
+    fixed_settings: true
+    use_apll: true
+    channel: left
+    sample_rate: 48000
+    alc_max: .5
+
+  - platform: i2s_audio
+    type: audio_in
+    id: adf_i2s_in
+    i2s_audio_id: i2s_shared
+    i2s_dout_pin: GPIO17
+    fixed_settings: true
+    use_apll: true
+    channel: left
+    sample_rate: 48000
+    pdm: false
+
+microphone:
+  - platform: adf_pipeline
+    id: onju_microphone
+    keep_pipeline_alive: true
+    gain_log2: 3
+    pipeline:
+      - adf_i2s_in
+      - resampler
+      - self
 
 media_player:
-  - platform: i2s_audio
-    name: None
+  - platform: adf_pipeline
     id: onju_out
-    dac_type: external
-    i2s_dout_pin: GPIO12
-    mode: mono
-    mute_pin:
-      number: GPIO21
-      inverted: True
+    name: None
+    internal: false
+    keep_pipeline_alive: true
+    pipeline:
+      - adf_i2s_in
+      - resampler
+      - self
     on_state:
       then:
         - lambda: |-
@@ -149,13 +193,6 @@ media_player:
               }
             }
             old_volume = new_volume;
-
-microphone:
-  - platform: i2s_audio
-    id: onju_microphone
-    i2s_din_pin: GPIO17
-    adc_type: external
-    pdm: false
 
 voice_assistant:
   id: va
@@ -179,7 +216,7 @@ voice_assistant:
         brightness: 70%
         effect: processing
   on_tts_end:
-    - media_player.play_media: !lambda return x;
+    #    - media_player.play_media: !lambda return x;
     - light.turn_on:
         id: top_led
         blue: 0%
@@ -187,11 +224,18 @@ voice_assistant:
         green: 100%
         effect: speaking
   on_end:
-    - delay: 100ms
+    #- delay: 100ms
     - wait_until:
         not:
           media_player.is_playing: onju_out
     - script.execute: reset_led
+    - if:
+        condition:
+          and:
+            - switch.is_on: use_wake_word
+            - binary_sensor.is_off: mute_switch
+        then:
+          - voice_assistant.start_continuous:
   on_timer_started:
     - light.turn_on:
         id: top_led
@@ -631,3 +675,9 @@ switch:
       - script.execute: reset_led
     on_turn_off:
       - script.execute: reset_led
+  - platform: gpio
+    id: dac_mute
+    restore_mode: ALWAYS_OFF
+    pin:
+      number: GPIO21
+      inverted: True
