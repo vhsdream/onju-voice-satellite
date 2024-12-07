@@ -166,7 +166,7 @@ adf_pipeline:
     use_apll: true
     channel: left
     sample_rate: 48000
-    alc_max: .5
+#    alc_max: .5
 
   - platform: i2s_audio
     type: audio_in
@@ -195,6 +195,7 @@ media_player:
     name: None
     internal: false
     keep_pipeline_alive: true
+    codec: auto
     pipeline:
       - self
       - resampler
