@@ -273,7 +273,7 @@ voice_assistant:
         condition: media_player.is_playing
         then:
           - media_player.pause
-    - media_player.play_media: "$(wakeup_sound_url)"
+    - media_player.play_media: "${wakeup_sound_url}"
     - wait_until:
         not:
           media_player.is_playing: onju_out
