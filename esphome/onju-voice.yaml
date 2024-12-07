@@ -135,7 +135,8 @@ interval:
           button: 2
 
 i2s_audio:
-  - i2s_lrclk_pin: GPIO13
+  - id: i2s_shared
+    i2s_lrclk_pin: GPIO13
     i2s_bclk_pin: GPIO18
     access_mode: duplex
 
@@ -266,6 +267,16 @@ voice_assistant:
             - binary_sensor.is_off: mute_switch
         then:
           - voice_assistant.stop:
+  on_wake_word_detected:
+    - if:
+        condition: media_player.is_playing
+        then:
+          - media_player.pause
+    - media_player.play_media: "$(wakeup_sound_url)"
+    - wait_until:
+        not:
+          media_player.is_playing: onju_out
+    - voice_assistant.start_continuous
   on_error:
     - media_player.play_media: "${error_sound_url}"
     - light.turn_on:
